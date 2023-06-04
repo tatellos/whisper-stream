@@ -5,12 +5,22 @@ document.getElementById("start").onclick = () => {
     // Get microphone access
     navigator.mediaDevices.getUserMedia({audio: true})
         .then(stream => {
-            const mediaRecorder = new MediaRecorder(stream, {mimeType: "audio/webm;codecs=opus", bitsPerSecond: 256000});
+            const mediaRecorder = new MediaRecorder(stream, {
+                mimeType: "audio/webm;codecs=opus",
+                bitsPerSecond: 256000
+            });
             mediaRecorder.start(1000); // commit every second
 
             const socket = new WebSocket('ws://localhost:8000');
 
-            socket.onmessage = msg => console.log(msg.data) // this will be the display of subtitles
+            socket.onmessage = msg => {
+                console.log(msg.data)
+                const response = JSON.parse(msg.data)
+                const p = document.createElement("p");
+                p.textContent = response["commit"]
+                document.getElementById("transcription").appendChild(p)
+                document.getElementById("tentative").textContent = response["tentative"];
+            }
 
             mediaRecorder.addEventListener('dataavailable', e => {
                 // This should be called roughly every second, by the mediaRecorder
