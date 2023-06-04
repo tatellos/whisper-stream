@@ -2,7 +2,7 @@ document.getElementById("start").onclick = () => {
     // Get microphone access
     navigator.mediaDevices.getUserMedia({audio: true})
         .then(stream => {
-            const mediaRecorder = new MediaRecorder(stream);
+            const mediaRecorder = new MediaRecorder(stream, {mimeType: "audio/webm;codecs=opus "});
             mediaRecorder.start(1000); // commit every second
 
             const socket = new WebSocket('ws://localhost:8000');
@@ -14,6 +14,9 @@ document.getElementById("start").onclick = () => {
                 console.log("data available:", e.data)
                 socket.send(e.data)
             });
+
+            console.log("Streaming audio to user with bitrate", mediaRecorder.audioBitsPerSecond)
+            console.log("Streaming audio to user with mimeType", mediaRecorder.mimeType)
         })
         .catch(err => {
             console.log('Unable to access mic', err);

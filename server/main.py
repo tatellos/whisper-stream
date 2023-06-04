@@ -1,32 +1,21 @@
 import asyncio
+import os
 
 import websockets
 import whisper
 
 audio_model = whisper.load_model("tiny")
 
-i = 0
-y = 8
 bytesToSave = b""
-
+filename = 'audio.ogg'
 
 async def websocket_handler(websocket, path):
-    global i, y, bytesToSave
     async for message in websocket:
         print(f"Received message: {message}")
-        byteString = message
-        if len(byteString) > 5:
-            filename = str(i) + 'audio.ogg'
-            i += 1
-            if y > 0:
-                # just testing the sound quality when adding multiple seconds together. It seems good!
-                y -= 1
-                bytesToSave += byteString
-            else:
-                y = 8
-                with open(filename, 'wb') as file:
-                    file.write(bytesToSave)
-                bytesToSave = b""
+        if len(message) > 5:
+            print("appending to file")
+            with open(filename, 'ab') as file:
+                file.write(message)
 
             # result = audio_model.transcribe(filename, language="en", task="transcribe")
             await websocket.send('result["text"]')
