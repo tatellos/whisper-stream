@@ -3,7 +3,9 @@ let stopButton = document.getElementById("stop");
 let mediaRecorder;
 let socket;
 
-const socketUrl = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host+ "/socket";
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const randomSixDigits = Math.floor(Math.random() * 900000) + 100000;
+const socketUrl = protocol + '//' + window.location.host + "/socket/" + randomSixDigits;
 
 startButton.onclick = () => {
     startButton.disabled = true;

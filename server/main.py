@@ -14,10 +14,28 @@ audio_model = whisper.load_model("large-v2")
 print("READY")
 
 
+def get_session_from_path(path):
+    # strip "/socket/" from the start
+    session = path[8:]
+    # Ensure that the session is six digits
+    if len(session)!= 6:
+        return None
+    try:
+        int(session)
+    except ValueError:
+        return None
+
+    return session
+
 async def websocket_handler(websocket, path):
-    clean_up_files()
+    print(path)
+    session = get_session_from_path(path)
+    print(session)
+    if session is None: return
+
+    cleanup_files(session)
     q = asyncio.Queue()
-    listener_task = asyncio.create_task(listen_for_messages(websocket, q))
+    listener_task = asyncio.create_task(listen_for_messages(websocket, q, session))
     sender_task = asyncio.create_task(send_messages(websocket, q))
 
     print("Starting tasks", path)
@@ -31,16 +49,16 @@ async def websocket_handler(websocket, path):
         task.cancel()
 
 
-async def listen_for_messages(websocket, q):
+async def listen_for_messages(websocket, q, session):
     try:
         async for message in websocket:
             # print(f"Received message: {message[:10]}...")
             if len(message) > 5:
                 print("appending x bytes to file", len(message))
-                with open(streamed_audio, 'ab') as file:
+                with open(session + streamed_audio, 'ab') as file:
                     file.write(message)
                 if q.empty():
-                    await q.put(streamed_audio)
+                    await q.put(session)
                     print("Triggered Queue")
     except websockets.exceptions.ConnectionClosed:
         print("ConnectionClosed")
@@ -49,17 +67,18 @@ async def listen_for_messages(websocket, q):
 async def send_messages(websocket, q):
     start_time = 0
     while True:
-        fname = await q.get()
+        session = await q.get()
         # print("Converting audio")
-        all_sound = AudioSegment.from_file(fname, format="webm", codec="opus")
+        all_sound = AudioSegment.from_file(session + streamed_audio, format="webm", codec="opus")
         # print("Ogg filesize", len(all_sound))
         duration = len(all_sound) - start_time
-        all_sound[start_time:].export(decompressed_wave, format="wav")
+        decompressed_filename = session + decompressed_wave
+        all_sound[start_time:].export(decompressed_filename, format="wav")
         # print("Finished wav audio")
 
-        filesize = os.path.getsize(decompressed_wave)
+        filesize = os.path.getsize(decompressed_filename)
         print("Transcribing filesize", filesize)
-        translation = audio_model.transcribe(decompressed_wave, language="de", task="translate")
+        translation = audio_model.transcribe(decompressed_filename, language="de", task="translate")
         segments = translation["segments"]
         # remove segments that are longer/later than the duration of the file
         segments = [segment for segment in segments if segment["end"] <= duration / 1000]
@@ -85,11 +104,11 @@ def print_segments(segments):
     )
 
 
-def clean_up_files():
-    if os.path.exists(streamed_audio):
-        os.remove(streamed_audio)
-    if os.path.exists(decompressed_wave):
-        os.remove(decompressed_wave)
+def cleanup_files(session):
+    if os.path.exists(session + streamed_audio):
+        os.remove(session + streamed_audio)
+    if os.path.exists(session + decompressed_wave):
+        os.remove(session + decompressed_wave)
 
 
 if __name__ == "__main__":
