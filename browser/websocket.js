@@ -3,6 +3,8 @@ let stopButton = document.getElementById("stop");
 let mediaRecorder;
 let socket;
 
+const socketUrl = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host+ "/socket";
+
 startButton.onclick = () => {
     startButton.disabled = true;
     stopButton.disabled = false;
@@ -15,7 +17,7 @@ startButton.onclick = () => {
             });
             mediaRecorder.start(1000); // commit every second
 
-            socket = new WebSocket('ws://localhost:8000');
+            socket = new WebSocket(socketUrl);
 
             socket.onmessage = msg => {
                 const response = JSON.parse(msg.data)

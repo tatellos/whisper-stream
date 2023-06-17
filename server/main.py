@@ -93,6 +93,9 @@ def clean_up_files():
 
 
 if __name__ == "__main__":
-    start_server = websockets.serve(websocket_handler, "localhost", 8000)
+    server = "localhost"
+    port = 8000
+    start_server = websockets.serve(websocket_handler, server, port)
     asyncio.get_event_loop().run_until_complete(start_server)
     asyncio.get_event_loop().run_forever()
+    print("listening on ", server, port)
