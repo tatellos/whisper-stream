@@ -78,7 +78,11 @@ async def send_messages(websocket, q):
 
         filesize = os.path.getsize(decompressed_filename)
         print("Transcribing filesize", filesize)
-        translation = audio_model.transcribe(decompressed_filename, language="de", task="translate")
+        try:
+            translation = audio_model.transcribe(decompressed_filename, language="de", task="translate")
+        except Exception as e:
+            print("Error transcribing", e)
+            continue
         segments = translation["segments"]
         # remove segments that are longer/later than the duration of the file
         segments = [segment for segment in segments if segment["end"] <= duration / 1000]
