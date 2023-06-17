@@ -69,7 +69,11 @@ async def send_messages(websocket, q):
     while True:
         session = await q.get()
         # print("Converting audio")
-        all_sound = AudioSegment.from_file(session + streamed_audio, format="webm", codec="opus")
+        try:
+            all_sound = AudioSegment.from_file(session + streamed_audio, format="webm", codec="opus")
+        except Exception as e:
+            print("Error converting to wav", e)
+            continue
         # print("Ogg filesize", len(all_sound))
         duration = len(all_sound) - start_time
         decompressed_filename = session + decompressed_wave
