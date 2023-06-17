@@ -10,7 +10,7 @@ streamed_audio = 'audio.ogg'
 decompressed_wave = "destination.wav"
 
 # Load AI, then report that it's done and ready
-audio_model = whisper.load_model("medium")
+audio_model = whisper.load_model("large-v2")
 print("READY")
 
 
