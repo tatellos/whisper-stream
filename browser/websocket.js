@@ -1,20 +1,23 @@
-// We have to use complete files in the backend. Have to assemble the stream there.
-// This means we periodically have to reset the audio file here in the frontend.
-// I.e. with a fixed interval (kind of a buffer-size {in the backend}) we need to stop and start the media recorder. The backend also has to be told when this happens.
-document.getElementById("start").onclick = () => {
+let startButton = document.getElementById("start");
+let stopButton = document.getElementById("stop");
+let mediaRecorder;
+let socket;
+
+startButton.onclick = () => {
+    startButton.disabled = true;
+    stopButton.disabled = false;
     // Get microphone access
     navigator.mediaDevices.getUserMedia({audio: true})
         .then(stream => {
-            const mediaRecorder = new MediaRecorder(stream, {
+            mediaRecorder = new MediaRecorder(stream, {
                 mimeType: "audio/webm;codecs=opus",
                 bitsPerSecond: 256000
             });
             mediaRecorder.start(1000); // commit every second
 
-            const socket = new WebSocket('ws://localhost:8000');
+            socket = new WebSocket('ws://localhost:8000');
 
             socket.onmessage = msg => {
-                console.log(msg.data)
                 const response = JSON.parse(msg.data)
                 const p = document.createElement("p");
                 p.textContent = response["commit"]
@@ -24,7 +27,6 @@ document.getElementById("start").onclick = () => {
 
             mediaRecorder.addEventListener('dataavailable', e => {
                 // This should be called roughly every second, by the mediaRecorder
-                console.log("data available:", e.data)
                 socket.send(e.data)
             });
 
@@ -34,4 +36,11 @@ document.getElementById("start").onclick = () => {
         .catch(err => {
             console.log('Unable to access mic', err);
         });
+}
+
+stopButton.onclick = () => {
+    startButton.disabled = false;
+    stopButton.disabled = true;
+    mediaRecorder.stop();
+    socket.close();
 }

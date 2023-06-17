@@ -3,6 +3,11 @@
 <head>
     <meta charset="utf-8"/>
     <title>Live Subtitles</title>
+    <style>
+        #tentative {
+            opacity: 0.6;
+        }
+    </style>
 </head>
 <body>
 
@@ -10,8 +15,9 @@
 
 <p>This will stream your microphone audio to the server. The server replies with AI-generated subtitles.</p>
 <button id="start">Start</button>
-<div id="transcription"></div>
+<button id="stop" disabled>Stop</button>
 <p id="tentative"></p>
+<div id="transcription"></div>
 
 <script src="websocket.js">
 </script>
