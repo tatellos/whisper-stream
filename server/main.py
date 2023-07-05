@@ -1,31 +1,24 @@
+# main TODO: fix ogg / wave shit. try without compression somehow?
+# parallel users somehow break each other, and it's not clear how:
+# probably because
 import asyncio
 import json
 import os
+import datetime
 
 import websockets
 import whisper
 from pydub import AudioSegment
 
+from server.utils import get_session_from_path, cleanup_files
+
 streamed_audio = 'audio.ogg'
 decompressed_wave = "destination.wav"
 
 # Load AI, then report that it's done and ready
-audio_model = whisper.load_model("large-v2")
+audio_model = whisper.load_model("tiny")
 print("READY")
 
-
-def get_session_from_path(path):
-    # strip "/socket/" from the start
-    session = path[8:]
-    # Ensure that the session is six digits
-    if len(session)!= 6:
-        return None
-    try:
-        int(session)
-    except ValueError:
-        return None
-
-    return session
 
 async def websocket_handler(websocket, path):
     print(path)
@@ -54,12 +47,13 @@ async def listen_for_messages(websocket, q, session):
         async for message in websocket:
             # print(f"Received message: {message[:10]}...")
             if len(message) > 5:
-                print("appending x bytes to file", len(message))
+                # print("appending x bytes to file", len(message))
                 with open(session + streamed_audio, 'ab') as file:
                     file.write(message)
+                    print(datetime.datetime.now(), " wrote to ", file.name)
                 if q.empty():
                     await q.put(session)
-                    print("Triggered Queue")
+                    print("Triggered Queue", session)
     except websockets.exceptions.ConnectionClosed:
         print("ConnectionClosed")
 
@@ -68,7 +62,7 @@ async def send_messages(websocket, q):
     start_time = 0
     while True:
         session = await q.get()
-        # print("Converting audio")
+        print("Converting audio")
         try:
             all_sound = AudioSegment.from_file(session + streamed_audio, format="webm", codec="opus")
         except Exception as e:
@@ -104,19 +98,6 @@ async def send_messages(websocket, q):
             if result is not None:
                 response["commit"] = result
             await websocket.send(json.dumps(response))
-
-
-def print_segments(segments):
-    return "\n".join(
-        [" ".join(["          ", str(x["start"]), str(x["end"]), str(x["text"])]) for x in segments]
-    )
-
-
-def cleanup_files(session):
-    if os.path.exists(session + streamed_audio):
-        os.remove(session + streamed_audio)
-    if os.path.exists(session + decompressed_wave):
-        os.remove(session + decompressed_wave)
 
 
 if __name__ == "__main__":

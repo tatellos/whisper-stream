@@ -69,3 +69,6 @@ env.bak/
 venv.bak/
 
 .idea/
+
+*.wav
+*.ogg
