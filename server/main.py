@@ -2,6 +2,7 @@
 # parallel users somehow break each other, and it's not clear how:
 # probably because
 import asyncio
+import io
 import json
 import os
 import datetime
@@ -10,9 +11,9 @@ import websockets
 import whisper
 from pydub import AudioSegment
 
-from server.utils import get_session_from_path, cleanup_files
+from server.utils import get_session_from_path
 
-streamed_audio = 'audio.ogg'
+streamed_audio_filename = 'audio.wav'
 decompressed_wave = "destination.wav"
 
 # Load AI, then report that it's done and ready
@@ -26,7 +27,6 @@ async def websocket_handler(websocket, path):
     print(session)
     if session is None: return
 
-    cleanup_files(session)
     q = asyncio.Queue()
     listener_task = asyncio.create_task(listen_for_messages(websocket, q, session))
     sender_task = asyncio.create_task(send_messages(websocket, q))
@@ -41,16 +41,21 @@ async def websocket_handler(websocket, path):
     for task in pending:
         task.cancel()
 
-
 async def listen_for_messages(websocket, q, session):
+    ogg_bytes = b'' # TODO This ogg file grows forever
     try:
         async for message in websocket:
-            # print(f"Received message: {message[:10]}...")
-            if len(message) > 5:
-                # print("appending x bytes to file", len(message))
-                with open(session + streamed_audio, 'ab') as file:
-                    file.write(message)
-                    print(datetime.datetime.now(), " wrote to ", file.name)
+            if len(message) > 2:
+                if message == "reset":
+                    # TODO the frontend could send these reset messages every like 3 minutes
+                    ogg_bytes = b''
+                    continue
+                ogg_bytes += message
+                ogg_file = io.BytesIO(ogg_bytes)
+                wave_audio = AudioSegment.from_file(ogg_file)
+                wave_filename = session + streamed_audio_filename
+                wave_audio.export(wave_filename, format="wav")
+                print(datetime.datetime.now(), " wrote to ", wave_filename)
                 if q.empty():
                     await q.put(session)
                     print("Triggered Queue", session)
@@ -59,25 +64,15 @@ async def listen_for_messages(websocket, q, session):
 
 
 async def send_messages(websocket, q):
-    start_time = 0
+    start_time = 0 # TODO the start time is mixed between sessions. Very bad. XXX
     while True:
         session = await q.get()
-        print("Converting audio")
+        wave_filename = session + streamed_audio_filename
+        duration = len(AudioSegment.from_wav(wave_filename)) - start_time
+        filesize = os.path.getsize(wave_filename)
+        print("Transcribing filesize", filesize, "duration", duration)
         try:
-            all_sound = AudioSegment.from_file(session + streamed_audio, format="webm", codec="opus")
-        except Exception as e:
-            print("Error converting to wav", e)
-            continue
-        # print("Ogg filesize", len(all_sound))
-        duration = len(all_sound) - start_time
-        decompressed_filename = session + decompressed_wave
-        all_sound[start_time:].export(decompressed_filename, format="wav")
-        # print("Finished wav audio")
-
-        filesize = os.path.getsize(decompressed_filename)
-        print("Transcribing filesize", filesize)
-        try:
-            translation = audio_model.transcribe(decompressed_filename, language="de", task="translate")
+            translation = audio_model.transcribe(wave_filename, language="de", task="translate")
         except Exception as e:
             print("Error transcribing", e)
             continue

@@ -16,10 +16,3 @@ def print_segments(segments):
     return "\n".join(
         [" ".join(["          ", str(x["start"]), str(x["end"]), str(x["text"])]) for x in segments]
     )
-
-
-def cleanup_files(session):
-    if os.path.exists(session + streamed_audio):
-        os.remove(session + streamed_audio)
-    if os.path.exists(session + decompressed_wave):
-        os.remove(session + decompressed_wave)
