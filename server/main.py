@@ -1,6 +1,3 @@
-# main TODO: fix ogg / wave shit. try without compression somehow?
-# parallel users somehow break each other, and it's not clear how:
-# probably because
 import asyncio
 import io
 import json
