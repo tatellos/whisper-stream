@@ -51,6 +51,8 @@ async def websocket_handler(websocket, path):
     print("cleaning up")
     for task in pending:
         task.cancel()
+    if os.path.exists(session_store[session]["wave_filename"]):
+        os.remove(session_store[session]["wave_filename"])
     del session_store[session]
 
 
@@ -85,7 +87,8 @@ async def send_messages():
         print(datetime.datetime.now(), " wrote to ", wave_filename)
 
         filesize = os.path.getsize(wave_filename)
-        print("Transcribing filesize", filesize, "duration", duration, "ogg length is", len(session_store[session]["ogg_buffer"]))
+        print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
+              len(session_store[session]["ogg_buffer"]))
         try:
             translation = audio_model.transcribe(wave_filename, language="de", task="translate")
         except Exception as e:
