@@ -20,14 +20,16 @@ session_store = {
     "example": {
         "websocket": "the websocket instance that spawned the session",
         "audio_offset": "the time in ms from where to start transcribing",
-        "ogg_buffer": "an ever-growing ogg bytestream that is the result of the stream from the browser"
+        "ogg_buffer": "an ever-growing ogg bytestream that is the result of the stream from the browser",
+        "wave_filename": "some name",
+        "ConnectionClosed": "False"
     }
 }
 
 
 async def websocket_handler(websocket, path):
     print(path)
-    if path == "/socket/status" :
+    if path == "/socket/status":
         await websocket.send("hello")
         return
 
@@ -39,7 +41,8 @@ async def websocket_handler(websocket, path):
         "websocket": websocket,
         "audio_offset": 0,
         "ogg_buffer": b'',
-        "wave_filename": session + streamed_audio_filename
+        "wave_filename": session + streamed_audio_filename,
+        "ConnectionClosed": False
     }
 
     listener_task = asyncio.create_task(listen_for_messages(session))
@@ -60,7 +63,10 @@ async def websocket_handler(websocket, path):
 
 async def listen_for_messages(session):
     try:
-        async for message in session_store[session]["websocket"]:
+        websocket = session_store[session]["websocket"]
+        async for message in websocket:
+            if session_store[session]["ConnectionClosed"]: return
+
             if len(message) > 2:
                 if message == "reset":
                     # TODO the frontend could send these reset messages every like 3 minutes
@@ -74,11 +80,14 @@ async def listen_for_messages(session):
                     print("Triggered Queue", session)
     except websockets.exceptions.ConnectionClosed:
         print("ConnectionClosed")
+        if session in session_store:
+            session_store[session]["ConnectionClosed"] = True
 
 
 async def send_messages():
     while True:
         session = await q.get()
+        if session_store[session]["ConnectionClosed"]: return
 
         wave_filename = session_store[session]["wave_filename"]
         ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
@@ -99,14 +108,13 @@ async def send_messages():
             continue
         segments = translation["segments"]
         # remove segments that are longer/later than the duration of the file
-        segments = [segment for segment in segments if segment["end"] <= duration / 1000]
+        segments = [segment for segment in segments if segment["end"] <= (duration / 1000) + 1]
         # print(len(segments), "segments: \n", print_segments(segments))
         result = None
         if len(segments) > 1:
             result = " ".join([x["text"] for x in segments[:-1]])
             print("Sending result", result)
             session_store[session]["audio_offset"] += min(segments[-2]["end"], segments[-1]["start"]) * 1000
-            # print("New start time:", start_time)
         if len(segments) > 0:
             response = {
                 "tentative": segments[-1]["text"]
@@ -117,6 +125,8 @@ async def send_messages():
                 await session_store[session]["websocket"].send(json.dumps(response))
             except websockets.exceptions.ConnectionClosed:
                 print("Closed connection: Session", session)
+                if session in session_store:
+                    session_store[session]["ConnectionClosed"] = True
 
 
 def get_session_from_path(path):
