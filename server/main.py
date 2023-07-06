@@ -8,8 +8,6 @@ import websockets
 import whisper
 from pydub import AudioSegment
 
-from server.utils import get_session_from_path
-
 streamed_audio_filename = 'audio.wav'
 decompressed_wave = "destination.wav"
 
@@ -81,6 +79,7 @@ async def listen_for_messages(session):
 async def send_messages():
     while True:
         session = await q.get()
+
         wave_filename = session_store[session]["wave_filename"]
         ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
 
@@ -120,8 +119,28 @@ async def send_messages():
                 print("Closed connection: Session", session)
 
 
+def get_session_from_path(path):
+    # strip "/socket/" from the start
+    session = path[8:]
+    # Ensure that the session is six digits
+    if len(session) != 6:
+        return None
+    try:
+        int(session)
+    except ValueError:
+        return None
+
+    return session
+
+
+def print_segments(segments):
+    return "\n".join(
+        [" ".join(["          ", str(x["start"]), str(x["end"]), str(x["text"])]) for x in segments]
+    )
+
+
 if __name__ == "__main__":
-    server = "localhost"
+    server = "0.0.0.0"
     port = 8000
     start_server = websockets.serve(websocket_handler, server, port)
     asyncio.get_event_loop().run_until_complete(start_server)
