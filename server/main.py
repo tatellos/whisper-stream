@@ -29,6 +29,10 @@ session_store = {
 
 async def websocket_handler(websocket, path):
     print(path)
+    if path == "/socket/status" :
+        await websocket.send("hello")
+        return
+
     session = get_session_from_path(path)
     print(session)
     if session is None: return
@@ -40,7 +44,7 @@ async def websocket_handler(websocket, path):
         "wave_filename": session + streamed_audio_filename
     }
 
-    listener_task = asyncio.create_task(listen_for_messages(websocket, session))
+    listener_task = asyncio.create_task(listen_for_messages(session))
 
     print("Starting tasks", path)
     done, pending = await asyncio.wait(
@@ -56,9 +60,9 @@ async def websocket_handler(websocket, path):
     del session_store[session]
 
 
-async def listen_for_messages(websocket, session):
+async def listen_for_messages(session):
     try:
-        async for message in websocket:
+        async for message in session_store[session]["websocket"]:
             if len(message) > 2:
                 if message == "reset":
                     # TODO the frontend could send these reset messages every like 3 minutes

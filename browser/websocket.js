@@ -5,7 +5,16 @@ let socket;
 
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const randomSixDigits = Math.floor(Math.random() * 900000) + 100000;
-const socketUrl = protocol + '//' + window.location.host + "/socket/" + randomSixDigits;
+const socketBaseUrl = protocol + '//' + window.location.host + "/socket/";
+statusSocket = new WebSocket(socketBaseUrl + "status");
+const timerForError = setTimeout(() => document.getElementById("status").style.display = "inherit", 500)
+statusSocket.onmessage = hello => {
+    statusSocket.close();
+    clearTimeout(timerForError)
+    document.getElementById("status").style.display = "none"
+}
+
+const socketUrl = socketBaseUrl + randomSixDigits;
 
 startButton.onclick = () => {
     startButton.disabled = true;
@@ -14,8 +23,7 @@ startButton.onclick = () => {
     navigator.mediaDevices.getUserMedia({audio: true})
         .then(stream => {
             mediaRecorder = new MediaRecorder(stream, {
-                mimeType: "audio/webm;codecs=opus",
-                bitsPerSecond: 256000
+                mimeType: "audio/webm;codecs=opus", bitsPerSecond: 256000
             });
             mediaRecorder.start(1000); // commit every second
 
