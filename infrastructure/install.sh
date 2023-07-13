@@ -1,10 +1,10 @@
 sudo echo hello
 
 git clone https://github.com/tatellos/whisper-stream.git
-sudo apt update
-sudo apt upgrade -y
+#sudo apt update
+#sudo apt upgrade -y
 sudo apt install -y ffmpeg nginx #xorg nvidia-driver-460
-sudo reboot
+#sudo reboot
 
 cd whisper-stream/server
 pip install -r requirements.txt
