@@ -1,4 +1,3 @@
-# TODO Ideas: Reset the buffer. Build a simple index for frames, to make sure they are processed in correct order
 import asyncio
 import io
 import json
@@ -8,25 +7,21 @@ import datetime
 import websockets
 import whisper
 from pydub import AudioSegment
+from functools import reduce
 
 streamed_audio_filename = 'audio.wav'
 decompressed_wave = "destination.wav"
 
 # Load AI, then report that it's done and ready
-audio_model = whisper.load_model("large-v2")
+# audio_model = whisper.load_model("tiny")
 print("READY")
 
 q = asyncio.Queue()
 session_store = {
     "example": {
         "websocket": "the websocket instance that spawned the session",
-        "skip_wav_seconds": "the time in ms from where to start transcribing",
-        "ogg_buffer": {
-            0: ["a dict of arrays. Keys correspond to separate OGG files, e.g. minutes recorded (restarting "
-                "the recorder every minute)"],
-            1: ["Elements in the inner arrays are chunks of ogg audio."],
-            2: ["They have an index so that out-of-order packets are transcribed in the correct order."]
-        },
+        "audio_offset": "the time in ms from where to start transcribing",
+        "ogg_buffer": "an ever-growing ogg bytestream that is the result of the stream from the browser",
         "wave_filename": "some name",
         "ConnectionClosed": "False"
     }
@@ -45,8 +40,8 @@ async def websocket_handler(websocket, path):
 
     session_store[session] = {
         "websocket": websocket,
-        "skip_wav_seconds": 0,
-        "ogg_buffer": dict(),
+        "audio_offset": 0,
+        "ogg_buffer": b'',
         "wave_filename": session + streamed_audio_filename,
         "ConnectionClosed": False
     }
@@ -70,21 +65,16 @@ async def websocket_handler(websocket, path):
 async def listen_for_messages(session):
     try:
         websocket = session_store[session]["websocket"]
-        async for rawMessage in websocket:
+        async for message in websocket:
             if session_store[session]["ConnectionClosed"]: return
 
-            message = json.loads(rawMessage)
-            chunk = message["chunk"]
-            ogg_buffer = session_store[session]["ogg_buffer"]
-            if chunk not in ogg_buffer:
-                ogg_buffer[chunk] = []
-            ogg_buffer[chunk].append(message)
-
-            if q.empty():
-                # TODO this might mean that some users never get their voice heard. probably most easily solved by having a queue per session
-                # it distributes the transcription randomly. But the same would happen with different queues.
-                await q.put(session)
-                print("Triggered Queue", session)
+            if len(message) > 2:
+                session_store[session]["ogg_buffer"] += message
+                if q.empty():
+                    # TODO this might mean that some users never get their voice heard. probably most easily solved by having a queue per session
+                    # it distributes the transcription randomly. But the same would happen with different queues.
+                    await q.put(session)
+                    print("Triggered Queue", session)
     except websockets.exceptions.ConnectionClosed:
         print("ConnectionClosed")
         if session in session_store:
@@ -96,8 +86,20 @@ async def send_messages():
         session = await q.get()
         if session_store[session]["ConnectionClosed"]: return
 
-        remove_outdated_ogg_files(session)
-        duration, filesize, wave_filename = await export_wave_file_from_smart_start(session)
+        wave_filename = session_store[session]["wave_filename"]
+        try:
+            ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
+            wave_audio = AudioSegment.from_file(ogg_file)
+        except Exception as e:
+            print("Error converting to wav", e)
+            continue
+
+        start_time = session_store[session]["audio_offset"]
+        duration = len(wave_audio) - start_time
+        wave_audio[start_time:].export(wave_filename, format="wav")
+        print(datetime.datetime.now(), " wrote to ", wave_filename)
+
+        filesize = os.path.getsize(wave_filename)
         print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
               len(session_store[session]["ogg_buffer"]))
         try:
@@ -113,7 +115,7 @@ async def send_messages():
         if len(segments) > 1:
             result = " ".join([x["text"] for x in segments[:-1]])
             print("Sending result", result)
-            session_store[session]["skip_wav_seconds"] += min(segments[-2]["end"], segments[-1]["start"]) * 1000
+            session_store[session]["audio_offset"] += min(segments[-2]["end"], segments[-1]["start"]) * 1000
         if len(segments) > 0:
             response = {
                 "tentative": segments[-1]["text"]
@@ -126,51 +128,6 @@ async def send_messages():
                 print("Closed connection: Session", session)
                 if session in session_store:
                     session_store[session]["ConnectionClosed"] = True
-
-
-
-
-async def remove_outdated_ogg_files(session):
-    ogg_buffer = session_store[session]["ogg_buffer"]
-    ogg_files = list(ogg_buffer.keys())
-
-    for ogg_file in ogg_files:
-        try:
-            ogg_bytes = io.BytesIO(ogg_buffer[ogg_file])
-            wave_audio = AudioSegment.from_file(ogg_bytes)
-        except:
-            pass
-
-    while session_store[session]["skip_wav_seconds"] > len(get_oldest_ogg_as_wave(session)):
-
-
-async def export_wave_file_from_smart_start(session):
-    ogg_buffer = session_store[session]["ogg_buffer"]
-    ogg_files = list(ogg_buffer.keys())
-    if len(ogg_files) > 2:
-        # TODO change to IF to gcheck for the start time istead!
-        del ogg_buffer[ogg_files[0]]
-
-    # TODO need to concat the bytestrings in the next lines
-    ogg_file_a = io.BytesIO(ogg_buffer[ogg_files[-2]])
-    ogg_file_b = io.BytesIO(ogg_buffer[ogg_files[-1]])
-
-    try:
-        wave_audio_a = AudioSegment.from_file(ogg_file_a)
-        wave_audio_b = AudioSegment.from_file(ogg_file_b)
-    except:
-        # TODO must handle this, sometimes this fails
-        pass
-
-    start_time = session_store[session]["skip_wav_seconds"]
-    duration = len(wave_audio) - start_time
-
-    wave_filename = session_store[session]["wave_filename"]
-    wave_audio[start_time:].export(wave_filename, format="wav")
-    print(datetime.datetime.now(), " wrote to ", wave_filename)
-    filesize = os.path.getsize(wave_filename)
-
-    return duration, filesize, wave_filename
 
 
 def get_session_from_path(path):
