@@ -68,10 +68,6 @@ async def listen_for_messages(session):
             if session_store[session]["ConnectionClosed"]: return
 
             if len(message) > 2:
-                if message == "reset":
-                    # TODO the frontend could send these reset messages every like 3 minutes
-                    session_store[session]["ogg_buffer"] = b''
-                    continue
                 session_store[session]["ogg_buffer"] += message
                 if q.empty():
                     # TODO this might mean that some users never get their voice heard. probably most easily solved by having a queue per session
@@ -90,9 +86,13 @@ async def send_messages():
         if session_store[session]["ConnectionClosed"]: return
 
         wave_filename = session_store[session]["wave_filename"]
-        ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
+        try:
+            ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
+            wave_audio = AudioSegment.from_file(ogg_file)
+        except Exception as e:
+            print("Error converting to wav", e)
+            continue
 
-        wave_audio = AudioSegment.from_file(ogg_file)
         start_time = session_store[session]["audio_offset"]
         duration = len(wave_audio) - start_time
         wave_audio[start_time:].export(wave_filename, format="wav")

@@ -25,7 +25,7 @@ startButton.onclick = () => {
             mediaRecorder = new MediaRecorder(stream, {
                 mimeType: "audio/webm;codecs=opus", bitsPerSecond: 256000
             });
-            mediaRecorder.start(1000); // commit every second
+            mediaRecorder.start(500); // chunk every half second
 
             socket = new WebSocket(socketUrl);
 
@@ -38,7 +38,6 @@ startButton.onclick = () => {
             }
 
             mediaRecorder.addEventListener('dataavailable', e => {
-                // This should be called roughly every second, by the mediaRecorder
                 socket.send(e.data)
             });
 

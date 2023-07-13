@@ -3,11 +3,13 @@ sudo echo hello
 git clone https://github.com/tatellos/whisper-stream.git
 #sudo apt update
 #sudo apt upgrade -y
-sudo apt install -y ffmpeg nginx #xorg nvidia-driver-460
+sudo apt install -y ffmpeg #nginx xorg nvidia-driver-460
 #sudo reboot
 
 cd whisper-stream/server
 pip install -r requirements.txt
+wget http://arens.ma/static/large-v2.pt
+mv large-v2.pt ~/.cache/whisper/
 python3 main.py
 
 sudo mkdir /etc/nginx/ssl
