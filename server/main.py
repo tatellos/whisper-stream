@@ -13,7 +13,7 @@ streamed_audio_filename = 'audio.wav'
 decompressed_wave = "destination.wav"
 
 # Load AI, then report that it's done and ready
-audio_model = whisper.load_model("tiny")
+audio_model = whisper.load_model("large-v2")
 print("READY")
 
 q = asyncio.Queue()
@@ -96,7 +96,7 @@ async def send_messages():
         session = await q.get()
         if session_store[session]["ConnectionClosed"]: return
 
-        while
+        remove_outdated_ogg_files(session)
         duration, filesize, wave_filename = await export_wave_file_from_smart_start(session)
         print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
               len(session_store[session]["ogg_buffer"]))
@@ -128,6 +128,22 @@ async def send_messages():
                     session_store[session]["ConnectionClosed"] = True
 
 
+
+
+async def remove_outdated_ogg_files(session):
+    ogg_buffer = session_store[session]["ogg_buffer"]
+    ogg_files = list(ogg_buffer.keys())
+
+    for ogg_file in ogg_files:
+        try:
+            ogg_bytes = io.BytesIO(ogg_buffer[ogg_file])
+            wave_audio = AudioSegment.from_file(ogg_bytes)
+        except:
+            pass
+
+    while session_store[session]["skip_wav_seconds"] > len(get_oldest_ogg_as_wave(session)):
+
+
 async def export_wave_file_from_smart_start(session):
     ogg_buffer = session_store[session]["ogg_buffer"]
     ogg_files = list(ogg_buffer.keys())
@@ -139,9 +155,12 @@ async def export_wave_file_from_smart_start(session):
     ogg_file_a = io.BytesIO(ogg_buffer[ogg_files[-2]])
     ogg_file_b = io.BytesIO(ogg_buffer[ogg_files[-1]])
 
-    wave_audio_a = AudioSegment.from_file(ogg_file_a)
-    wave_audio_b = AudioSegment.from_file(ogg_file_b)
-
+    try:
+        wave_audio_a = AudioSegment.from_file(ogg_file_a)
+        wave_audio_b = AudioSegment.from_file(ogg_file_b)
+    except:
+        # TODO must handle this, sometimes this fails
+        pass
 
     start_time = session_store[session]["skip_wav_seconds"]
     duration = len(wave_audio) - start_time
