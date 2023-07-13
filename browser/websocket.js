@@ -25,7 +25,7 @@ startButton.onclick = () => {
             mediaRecorder = new MediaRecorder(stream, {
                 mimeType: "audio/webm;codecs=opus", bitsPerSecond: 256000
             });
-            mediaRecorder.start(500); // chunk every half second
+            mediaRecorder.start(1000); // chunk every second
 
             socket = new WebSocket(socketUrl);
 
