@@ -5,14 +5,14 @@ import os
 import datetime
 
 import websockets
-import whisper
+from whisper_jax import FlaxWhisperPipline
 from pydub import AudioSegment
 
 streamed_audio_filename = 'audio.wav'
 decompressed_wave = "destination.wav"
 
 # Load AI, then report that it's done and ready
-audio_model = whisper.load_model("large-v2")
+pipeline = FlaxWhisperPipline("openai/whisper-large-v2")
 print("READY")
 
 q = asyncio.Queue()
@@ -102,7 +102,8 @@ async def send_messages():
         print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
               len(session_store[session]["ogg_buffer"]))
         try:
-            translation = audio_model.transcribe(wave_filename, language="de", task="translate")
+            translation = pipeline(wave_filename, task="translate", return_timestamps=True)
+            print("It worked")
         except Exception as e:
             print("Error transcribing", e)
             continue
