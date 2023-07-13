@@ -39,7 +39,7 @@ startButton.onclick = () => {
 
             mediaRecorder.addEventListener('dataavailable', e => {
                 // This should be called roughly every second, by the mediaRecorder
-                socket.send(e.data)
+                socket.send(JSON.stringify({chunk: 0, index: 0, data: e.data}))
             });
 
             console.log("Streaming audio to user with bitrate", mediaRecorder.audioBitsPerSecond)
