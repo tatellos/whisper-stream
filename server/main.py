@@ -65,15 +65,19 @@ async def listen_for_messages(session):
     try:
         websocket = session_store[session]["websocket"]
         async for message in websocket:
-            if session not in session_store or session_store[session]["ConnectionClosed"]: return
+            try:
+                if session not in session_store or session_store[session]["ConnectionClosed"]: return
 
-            if len(message) > 2:
-                session_store[session]["ogg_buffer"] += message
-                if q.empty():
-                    # TODO this might mean that some users never get their voice heard. probably most easily solved by having a queue per session
-                    # it distributes the transcription randomly. But the same would happen with different queues.
-                    await q.put(session)
-                    print("Triggered Queue", session)
+                if len(message) > 2:
+                    session_store[session]["ogg_buffer"] += message
+                    if q.empty():
+                        # TODO this might mean that some users never get their voice heard. probably most easily solved by having a queue per session
+                        # it distributes the transcription randomly. But the same would happen with different queues.
+                        await q.put(session)
+                        print("Triggered Queue", session)
+            except Exception as e:
+                print("Exception during message handling, continuing", e)
+                continue
     except websockets.exceptions.ConnectionClosed:
         print("ConnectionClosed")
         if session in session_store:
@@ -82,50 +86,55 @@ async def listen_for_messages(session):
 
 async def send_messages():
     while True:
-        session = await q.get()
-        if session not in session_store or session_store[session]["ConnectionClosed"]: return
-
-        wave_filename = session_store[session]["wave_filename"]
         try:
-            ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
-            wave_audio = AudioSegment.from_file(ogg_file)
-        except Exception as e:
-            print("Error converting to wav", e)
-            continue
+            session = await q.get()
+            if session not in session_store or session_store[session]["ConnectionClosed"]: return
 
-        start_time = session_store[session]["audio_offset"]
-        duration = len(wave_audio) - start_time
-        wave_audio[start_time:].export(wave_filename, format="wav")
-        print(datetime.datetime.now(), " wrote to ", wave_filename)
-
-        filesize = os.path.getsize(wave_filename)
-        print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
-              len(session_store[session]["ogg_buffer"]))
-        try:
-            translation = pipeline(wave_filename, task="translate", return_timestamps=True)
-        except Exception as e:
-            print("Error transcribing", e)
-            continue
-        segments = translation["chunks"]
-        # remove segments that are longer/later than the duration of the file
-        segments = [segment for segment in segments if segment["timestamp"][1] <= (duration / 1000) + 1]
-        result = None
-        if len(segments) > 1:
-            result = " ".join([x["text"] for x in segments[:-1]])
-            print("Sending result", result)
-            session_store[session]["audio_offset"] += min(segments[-2]["timestamp"][1], segments[-1]["timestamp"][0]) * 1000
-        if len(segments) > 0:
-            response = {
-                "tentative": segments[-1]["text"]
-            }
-            if result is not None:
-                response["commit"] = result
+            wave_filename = session_store[session]["wave_filename"]
             try:
-                await session_store[session]["websocket"].send(json.dumps(response))
-            except websockets.exceptions.ConnectionClosed:
-                print("Closed connection: Session", session)
-                if session in session_store:
-                    session_store[session]["ConnectionClosed"] = True
+                ogg_file = io.BytesIO(session_store[session]["ogg_buffer"])
+                wave_audio = AudioSegment.from_file(ogg_file)
+            except Exception as e:
+                print("Error converting to wav", e)
+                continue
+
+            start_time = session_store[session]["audio_offset"]
+            duration = len(wave_audio) - start_time
+            wave_audio[start_time:].export(wave_filename, format="wav")
+            print(datetime.datetime.now(), " wrote to ", wave_filename)
+
+            filesize = os.path.getsize(wave_filename)
+            print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
+                  len(session_store[session]["ogg_buffer"]))
+            try:
+                translation = pipeline(wave_filename, task="translate", return_timestamps=True)
+            except Exception as e:
+                print("Error transcribing", e)
+                continue
+            segments = translation["chunks"]
+            # remove segments that are longer/later than the duration of the file
+            segments = [segment for segment in segments if segment["timestamp"][1] <= (duration / 1000) + 1]
+            result = None
+            if len(segments) > 1:
+                result = " ".join([x["text"] for x in segments[:-1]])
+                print("Sending result", result)
+                session_store[session]["audio_offset"] += min(segments[-2]["timestamp"][1], segments[-1]["timestamp"][0]) * 1000
+            if len(segments) > 0:
+                response = {
+                    "tentative": segments[-1]["text"]
+                }
+                if result is not None:
+                    response["commit"] = result
+                try:
+                    await session_store[session]["websocket"].send(json.dumps(response))
+                except websockets.exceptions.ConnectionClosed:
+                    print("Closed connection: Session", session)
+                    if session in session_store:
+                        session_store[session]["ConnectionClosed"] = True
+        except Exception as e:
+            print("Exception during transcription loop, continuing.", e)
+            continue
+
 
 
 def get_session_from_path(path):
