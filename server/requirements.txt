@@ -1,3 +1,6 @@
+-f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
 websockets
+jax[cuda11_pip]
 git+https://github.com/sanchit-gandhi/whisper-jax.git
 pydub

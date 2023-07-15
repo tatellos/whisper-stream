@@ -103,19 +103,17 @@ async def send_messages():
               len(session_store[session]["ogg_buffer"]))
         try:
             translation = pipeline(wave_filename, task="translate", return_timestamps=True)
-            print("It worked")
         except Exception as e:
             print("Error transcribing", e)
             continue
-        segments = translation["segments"]
+        segments = translation["chunks"]
         # remove segments that are longer/later than the duration of the file
-        segments = [segment for segment in segments if segment["end"] <= (duration / 1000) + 1]
-        # print(len(segments), "segments: \n", print_segments(segments))
+        segments = [segment for segment in segments if segment["timestamp"][1] <= (duration / 1000) + 1]
         result = None
         if len(segments) > 1:
             result = " ".join([x["text"] for x in segments[:-1]])
             print("Sending result", result)
-            session_store[session]["audio_offset"] += min(segments[-2]["end"], segments[-1]["start"]) * 1000
+            session_store[session]["audio_offset"] += min(segments[-2]["timestamp"][1], segments[-1]["timestamp"][0]) * 1000
         if len(segments) > 0:
             response = {
                 "tentative": segments[-1]["text"]
@@ -142,12 +140,6 @@ def get_session_from_path(path):
         return None
 
     return session
-
-
-def print_segments(segments):
-    return "\n".join(
-        [" ".join(["          ", str(x["start"]), str(x["end"]), str(x["text"])]) for x in segments]
-    )
 
 
 if __name__ == "__main__":
