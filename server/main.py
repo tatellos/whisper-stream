@@ -65,7 +65,7 @@ async def listen_for_messages(session):
     try:
         websocket = session_store[session]["websocket"]
         async for message in websocket:
-            if session_store[session]["ConnectionClosed"]: return
+            if session not in session_store or session_store[session]["ConnectionClosed"]: return
 
             if len(message) > 2:
                 session_store[session]["ogg_buffer"] += message
@@ -83,7 +83,7 @@ async def listen_for_messages(session):
 async def send_messages():
     while True:
         session = await q.get()
-        if session_store[session]["ConnectionClosed"]: return
+        if session not in session_store or session_store[session]["ConnectionClosed"]: return
 
         wave_filename = session_store[session]["wave_filename"]
         try:
