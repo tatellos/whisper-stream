@@ -7,7 +7,10 @@ const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const randomSixDigits = Math.floor(Math.random() * 900000) + 100000;
 const socketBaseUrl = protocol + '//' + window.location.host + "/socket/";
 statusSocket = new WebSocket(socketBaseUrl + "status");
-const timerForError = setTimeout(() => document.getElementById("status").style.display = "inherit", 500)
+const timerForError = setTimeout(() => {
+    document.getElementById("status").style.display = "inherit";
+    makeTranscriptionFillScreen()
+}, 500)
 statusSocket.onmessage = hello => {
     statusSocket.close();
     clearTimeout(timerForError)
@@ -57,3 +60,10 @@ stopButton.onclick = () => {
     mediaRecorder.stop();
     socket.close();
 }
+
+function makeTranscriptionFillScreen() {
+    const transcriptionDiv = document.getElementById("transcription");
+
+    document.documentElement.style.setProperty('--above-transcription-height', `${transcriptionDiv.offsetTop}px`);
+}
+document.addEventListener('DOMContentLoaded', makeTranscriptionFillScreen);
