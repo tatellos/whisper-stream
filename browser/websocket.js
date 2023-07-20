@@ -33,7 +33,9 @@ startButton.onclick = () => {
                 const response = JSON.parse(msg.data)
                 const p = document.createElement("p");
                 p.textContent = response["commit"]
-                document.getElementById("transcription").appendChild(p)
+                let committedDiv = document.getElementById("transcription");
+                committedDiv.appendChild(p)
+                committedDiv.scrollTop = committedDiv.scrollHeight;
                 document.getElementById("tentative").textContent = response["tentative"];
             }
 
