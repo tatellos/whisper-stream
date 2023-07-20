@@ -12,7 +12,7 @@
 
         #transcription {
             margin-top: 1em;
-            max-height: calc(100vh - var(--above-transcription-height) - var(--tentative-height));
+            max-height: calc(100vh - var(--above-transcription-height) - var(--tentative-height) - 1em);
             overflow: auto;
             scroll-behavior: smooth;
         }
@@ -24,6 +24,7 @@
         #tentative {
             height: var(--tentative-height);
             opacity: 0.6;
+            margin-top: 0;
         }
     </style>
 </head>
