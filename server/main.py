@@ -88,7 +88,7 @@ async def send_messages():
     while True:
         try:
             session = await q.get()
-            if session not in session_store or session_store[session]["ConnectionClosed"]: return
+            if session not in session_store or session_store[session]["ConnectionClosed"]: continue
 
             wave_filename = session_store[session]["wave_filename"]
             try:
