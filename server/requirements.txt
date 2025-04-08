@@ -1,6 +1,9 @@
 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
-websockets
-jax[cuda11_pip]
+websockets==11.0.3
+jax[cuda12]==0.4.26
 git+https://github.com/sanchit-gandhi/whisper-jax.git
 pydub
+numpy==1.24.4
+jaxlib==0.4.26
+cached-property
