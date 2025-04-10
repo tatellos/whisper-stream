@@ -9,8 +9,6 @@ sudo apt install -y ffmpeg #nginx
 cd whisper-stream/server
 pip install --upgrade pip
 pip install -r requirements.txt
-#wget http://arens.ma/static/large-v2.pt
-#mv large-v2.pt ~/.cache/whisper/
 python3 main.py
 
 # the rest is only for serving the static files from the same server

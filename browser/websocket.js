@@ -46,8 +46,8 @@ startButton.onclick = () => {
                 socket.send(e.data)
             });
 
-            console.log("Streaming audio to user with bitrate", mediaRecorder.audioBitsPerSecond)
-            console.log("Streaming audio to user with mimeType", mediaRecorder.mimeType)
+            console.log("Streaming audio to server with bitrate", mediaRecorder.audioBitsPerSecond)
+            console.log("Streaming audio to server with mimeType", mediaRecorder.mimeType)
         })
         .catch(err => {
             console.log('Unable to access mic', err);

@@ -98,43 +98,59 @@ async def send_messages():
                 print("Error converting to wav", e)
                 continue
 
-            start_time = session_store[session]["audio_offset"]
-            duration = len(wave_audio) - start_time
-            wave_audio[start_time:].export(wave_filename, format="wav")
-            print(datetime.datetime.now(), " wrote to ", wave_filename)
+            duration = save_wave_file_to_transcribe(session, wave_audio, wave_filename)
 
-            filesize = os.path.getsize(wave_filename)
-            print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
-                  len(session_store[session]["ogg_buffer"]))
             try:
                 translation = pipeline(wave_filename, task="translate", return_timestamps=True)
             except Exception as e:
                 print("Error transcribing", e)
                 continue
-            segments = translation["chunks"]
-            # remove segments that are longer/later than the duration of the file
-            segments = [segment for segment in segments if segment["timestamp"][1] <= (duration / 1000) + 1]
+
+            # keep only segments that are not longer/later than the duration of the file
+            segments = [segment for segment in translation["chunks"] if segment["timestamp"][1] <= (duration / 1000) + 1]
+
             result = None
             if len(segments) > 1:
+                # Commit to all segments except the last one
                 result = " ".join([x["text"] for x in segments[:-1]])
                 print("Sending result", result)
                 session_store[session]["audio_offset"] += min(segments[-2]["timestamp"][1], segments[-1]["timestamp"][0]) * 1000
+
             if len(segments) > 0:
+                # Add the last segment as a "maybe"
                 response = {
                     "tentative": segments[-1]["text"]
                 }
                 if result is not None:
                     response["commit"] = result
-                try:
-                    await session_store[session]["websocket"].send(json.dumps(response))
-                except websockets.exceptions.ConnectionClosed:
-                    print("Closed connection: Session", session)
-                    if session in session_store:
-                        session_store[session]["ConnectionClosed"] = True
+
+                await send_response(response, session)
+
         except Exception as e:
             print("Exception during transcription loop, continuing.", e)
             continue
 
+
+async def send_response(response, session):
+    try:
+        await session_store[session]["websocket"].send(json.dumps(response))
+    except websockets.exceptions.ConnectionClosed:
+        print("Closed connection: Session", session)
+        if session in session_store:
+            session_store[session]["ConnectionClosed"] = True
+
+
+def save_wave_file_to_transcribe(session, wave_audio, wave_filename) -> int:
+    start_time = session_store[session]["audio_offset"]
+    duration = len(wave_audio) - start_time
+    wave_audio[start_time:].export(wave_filename, format="wav")
+    print(datetime.datetime.now(), " wrote to ", wave_filename)
+
+    filesize = os.path.getsize(wave_filename)
+    print("Transcribing filesize", filesize, "duration", duration, "ogg length is",
+          len(session_store[session]["ogg_buffer"]))
+
+    return duration
 
 
 def get_session_from_path(path):
