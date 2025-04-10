@@ -65,6 +65,9 @@ async def listen_for_messages(session):
     try:
         websocket = session_store[session]["websocket"]
         async for message in websocket:
+            # TODO when messages build up, the queue is triggered on the first message already, but it would be more
+            # efficient to trigger it only after the last message. Although this isn't a big problem, since all
+            # messages are written to the session store buffer before the queue is emptied next.
             try:
                 if session not in session_store or session_store[session]["ConnectionClosed"]: return
 
@@ -101,6 +104,8 @@ async def send_messages():
             duration = save_wave_file_to_transcribe(session, wave_audio, wave_filename)
 
             try:
+                # TODO this is a synchronous call. It blocks everything else, e.g. message reception (but they are
+                # buffered)
                 translation = pipeline(wave_filename, task="translate", return_timestamps=True)
             except Exception as e:
                 print("Error transcribing", e)
